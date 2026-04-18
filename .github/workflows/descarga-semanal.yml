@@ -1,0 +1,62 @@
+name: Descarga semanal de estadisticas
+
+# GitHub Actions solo admite cron en UTC. Madrid cambia entre CET (UTC+1) y
+# CEST (UTC+2), asi que configuramos las dos opciones para que siempre caiga
+# a las 15:00 hora local independientemente del horario de verano / invierno.
+on:
+  schedule:
+    - cron: '0 13 * * 5'   # Viernes 15:00 Madrid (CEST, horario de verano)
+    - cron: '0 14 * * 5'   # Viernes 15:00 Madrid (CET,  horario de invierno)
+  workflow_dispatch:        # Permite lanzarlo a mano desde la pestaña Actions
+
+# Necesario para que el job pueda hacer commit de los datos actualizados
+permissions:
+  contents: write
+
+jobs:
+  descargar:
+    name: Descargar y publicar estadisticas
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar descarga
+        run: python descargar_poblacion.py
+
+      - name: Copiar con timestamp a data/
+        run: |
+          mkdir -p data
+          FECHA=$(date -u +%Y-%m-%d)
+          cp estadisticas_poblacion.xlsx "data/estadisticas_poblacion_${FECHA}.xlsx"
+          ls -la data/
+
+      - name: Subir artefacto descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: estadisticas-poblacion-${{ github.run_id }}
+          path: estadisticas_poblacion.xlsx
+          retention-days: 90
+
+      - name: Commit de los datos actualizados
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ estadisticas_poblacion.xlsx
+          if git diff --staged --quiet; then
+            echo "No hay cambios que commitear."
+          else
+            git commit -m "data: actualizacion automatica $(date -u +%Y-%m-%d)"
+            git push
+          fi
