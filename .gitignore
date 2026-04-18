@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# No ignoramos los xlsx generados: los queremos versionados por el workflow.
+# Si prefieres NO versionarlos, descomenta:
+# *.xlsx
+# !data/.gitkeep
